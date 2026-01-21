@@ -3,6 +3,18 @@
     <head><title>Task Tracker</title></head>
     <body>
         <h1>Task Tracker</h1>
-        <p>If you can see this, Flask + templates are working.</p>
+        <form method="POST" action="/add">
+            <input name="task" placeholder="Add a task..." autocomplete="off" />
+            <button type ="submit">Add</button>
+        </form>
+        {% if tasks %}
+            <ol>
+                {% for t in tasks %}
+                    <li>{{ t }}</li>
+                {% endfor %}
+            </ol>
+        {% else %}
+            <p>No tasks yet.</p>
+        {% endif %}
     </body>
 </html>
