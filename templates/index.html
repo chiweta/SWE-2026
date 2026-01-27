@@ -1,42 +1,58 @@
-<!DOCTYPE html>
-<html>
-
+<!doctype html>
+<html lang="en">
 <head>
-    <title>Task Tracker</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Task Tracker</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+
+
+
 </head>
 
 <body>
-    <h1>Task Tracker</h1>
-    <form method="POST" action="/add">
-        <input name="task" placeholder="Add a task..." autocomplete="off" />
-        <button type="submit">Add</button>
+  <div class="container">
+    <div class="header">
+      <h1>Task Tracker</h1>
+      <div class="sub">{{ tasks|length }} task(s)</div>
+    </div>
+
+    <form method="POST" action="/add" class="topbar">
+      <input name="task" placeholder="Add a task..." autocomplete="off" autofocus />
+      <button type="submit" class="btn-primary">Add</button>
     </form>
-    {% if tasks %}
-    {% else %}
-    <p>No tasks yet.</p>
-    {% endif %}
+
+    <div class="divider"></div>
 
     {% if tasks %}
-    <form method="POST" action="/delete_selected">
-        <ol>
-            {% for t in tasks %}
-            <li>
-                <label>
-                    <input type="checkbox" name="nums" value="{{ loop.index }}">
-                    {{ t }}
-                </label>
-            </li>
-            {% endfor %}
-        </ol>
+      <form id="deleteForm" method="POST" action="/delete_selected" class="small-actions">
+        <button type="submit" class="btn-danger">Delete selected</button>
+      </form>
 
-        <button type="submit">Delete selected</button>
-    </form>
+      <form method="POST" action="/delete_all" style="margin:0;">
+  <button type="submit" class="btn-danger"
+    onclick="return confirm('Delete ALL tasks?')">
+    Delete all
+  </button>
+</form>
+
+      <ul class="list">
+        {% for t in tasks %}
+          <li class="item">
+            <input class="chk" type="checkbox" name="nums" value="{{ loop.index }}" form="deleteForm">
+
+            <form method="POST" action="/mark_done" style="margin:0;">
+              <input type="hidden" name="num" value="{{ loop.index }}">
+              <button class="toggle-btn" type="submit">{% if t.done %}✅{% else %}⬜{% endif %}</button>
+            </form>
+
+            <span class="task-text {% if t.done %}done{% endif %}">{{ t.text }}</span>
+          </li>
+        {% endfor %}
+      </ul>
     {% else %}
-    <p>No tasks yet.</p>
+      <p class="sub">No tasks yet.</p>
     {% endif %}
-
-
-
+  </div>
 </body>
-
 </html>
