@@ -1,20 +1,42 @@
 <!DOCTYPE html>
 <html>
-    <head><title>Task Tracker</title></head>
-    <body>
-        <h1>Task Tracker</h1>
-        <form method="POST" action="/add">
-            <input name="task" placeholder="Add a task..." autocomplete="off" />
-            <button type ="submit">Add</button>
-        </form>
-        {% if tasks %}
-            <ol>
-                {% for t in tasks %}
-                    <li>{{ t }}</li>
-                {% endfor %}
-            </ol>
-        {% else %}
-            <p>No tasks yet.</p>
-        {% endif %}
-    </body>
+
+<head>
+    <title>Task Tracker</title>
+</head>
+
+<body>
+    <h1>Task Tracker</h1>
+    <form method="POST" action="/add">
+        <input name="task" placeholder="Add a task..." autocomplete="off" />
+        <button type="submit">Add</button>
+    </form>
+    {% if tasks %}
+    {% else %}
+    <p>No tasks yet.</p>
+    {% endif %}
+
+    {% if tasks %}
+    <form method="POST" action="/delete_selected">
+        <ol>
+            {% for t in tasks %}
+            <li>
+                <label>
+                    <input type="checkbox" name="nums" value="{{ loop.index }}">
+                    {{ t }}
+                </label>
+            </li>
+            {% endfor %}
+        </ol>
+
+        <button type="submit">Delete selected</button>
+    </form>
+    {% else %}
+    <p>No tasks yet.</p>
+    {% endif %}
+
+
+
+</body>
+
 </html>
