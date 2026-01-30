@@ -13,7 +13,14 @@ app = Flask(
 FILE_PATH = BASE_DIR / "tasks.txt"
 
 
+# --------- Storage helpers (txt file) ---------
 def load_tasks():
+    """
+    Supports:
+      - old: "text"
+      - old: "done|text"
+      - new: "done|date|text"
+    """
     tasks = []
     try:
         with open(FILE_PATH, "r", encoding="utf-8") as f:
@@ -45,8 +52,6 @@ def load_tasks():
     return tasks
 
 
-
-
 def save_tasks(tasks):
     with open(FILE_PATH, "w", encoding="utf-8") as f:
         for t in tasks:
@@ -54,79 +59,106 @@ def save_tasks(tasks):
             f.write(f"{status}|{t['date']}|{t['text']}\n")
 
 
-def toggle_done(num):
-    tasks= load_tasks()
-    if 1 <= num <= len(tasks):
-        tasks[num - 1]["done"]= not tasks[num -1]["done"]
-        save_tasks(tasks)
+# --------- Pages ---------
 @app.get("/")
 def home():
+    selected_date = request.args.get("date") or date.today().isoformat()
     tasks = load_tasks()
-    return render_template("index.html", tasks=tasks)
+    return render_template("index.html", tasks=tasks, selected_date=selected_date)
 
 
+# --------- Actions (POST) ---------
 @app.post("/add")
 def add():
     task = request.form.get("task", "").strip()
-    task_date = request.form.get("date", "").strip() or date.today().isoformat()
+    day = request.form.get("date", "").strip() or date.today().isoformat()
 
     if task:
         tasks = load_tasks()
-        tasks.append({"done": False, "date": task_date, "text": task})
+        tasks.append({"done": False, "text": task, "date": day})
         save_tasks(tasks)
 
-    return redirect(url_for("home"))
+    return redirect(url_for("home", date=day))
 
+
+@app.post("/delete_day_selected")
+def delete_day_selected():
+    day = request.form.get("date", "").strip() or date.today().isoformat()
+
+    ids = request.form.getlist("ids")
+    try:
+        ids = sorted({int(x) for x in ids}, reverse=True)
+    except ValueError:
+        return redirect(url_for("home", date=day))
+
+    tasks = load_tasks()
+    for i in ids:
+        if 1 <= i <= len(tasks):
+            tasks.pop(i - 1)
+
+    save_tasks(tasks)
+    return redirect(url_for("home", date=day))
+
+
+@app.post("/delete_all_for_day")
+def delete_all_for_day():
+    day = request.form.get("date", "").strip() or date.today().isoformat()
+    tasks = [t for t in load_tasks() if t.get("date") != day]
+    save_tasks(tasks)
+    return redirect(url_for("home", date=day))
+
+
+# IMPORTANT: this is called via fetch() in JS, so return 204 (no redirect)
+@app.post("/toggle_done")
+def toggle_done_api():
+    task_id = request.form.get("id", "").strip()
+    try:
+        idx = int(task_id)
+    except ValueError:
+        return ("", 400)
+
+    tasks = load_tasks()
+    if 1 <= idx <= len(tasks):
+        tasks[idx - 1]["done"] = not tasks[idx - 1]["done"]
+        save_tasks(tasks)
+
+    return ("", 204)
+
+
+# --------- JSON feeds for the calendar + daily list ---------
 @app.get("/events")
 def events():
     tasks = load_tasks()
-    return jsonify([
-        {
+    out = []
+
+    for i, t in enumerate(tasks, start=1):
+        out.append({
             "title": ("✅ " if t["done"] else "") + t["text"],
-            "start": t["date"],   # YYYY-MM-DD
-            "allDay": True
-        }
-        for t in tasks
-        if t.get("date")
-    ])
+            "start": t["date"],
+            "allDay": True,
+            "extendedProps": {"id": i},
+        })
+
+    return jsonify(out)
 
 
-
-
-@app.post("/delete_selected")
-def delete_selected():
-    nums = request.form.getlist("nums")  # list of strings like ["1", "3", "5"]
-
-    try:
-        nums = sorted({int(n) for n in nums}, reverse=True)
-    except ValueError:
-        return redirect(url_for("home"))
-
+@app.get("/tasks_for_day")
+def tasks_for_day():
+    day = request.args.get("date", "").strip()
     tasks = load_tasks()
 
-    for n in nums:
-        if 1 <= n <= len(tasks):
-            tasks.pop(n - 1)
+    day_tasks = []
+    for i, t in enumerate(tasks, start=1):
+        if t.get("date") == day:
+            day_tasks.append({
+                "id": i,
+                "text": t["text"],
+                "done": t["done"],
+                "date": t["date"],
+            })
 
-    save_tasks(tasks)
-    return redirect(url_for("home"))
+    return jsonify(day_tasks)
 
-
-@app.post("/mark_done")
-def mark_done():
-    num_str = request.form.get("num", "").strip()
-    try:
-        num = int(num_str)
-    except ValueError:
-        return redirect(url_for("home"))
-
-    toggle_done(num)
-    return redirect(url_for("home"))
-
-@app.post("/delete_all")
-def delete_all():
-    save_tasks([])
-    return redirect(url_for("home"))
 
 if __name__ == "__main__":
     app.run(debug=True)

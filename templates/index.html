@@ -4,99 +4,189 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Task Tracker</title>
+
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
   <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.20/index.global.min.js"></script>
-
-
-
 </head>
 
 <body>
   <div class="container">
     <div class="header">
       <h1>Task Tracker</h1>
-      <div class="sub">{{ tasks|length }} task(s)</div>
+      <div class="sub">{{ tasks|length }} total task(s)</div>
     </div>
-  <div id="calendar"></div>
 
-
-
-
-    <form method="POST" action="/add" class="topbar" style="margin-top: 12px;">
-  <input type="hidden" name="date" id="taskDate">
-
-  <input id="taskInput" name="task" placeholder="Add a task..." autocomplete="off" autofocus />
-  <button type="submit" class="btn-primary">Add</button>
-</form>
-
+    <!-- Calendar -->
+    <div id="calendar"></div>
 
     <div class="divider"></div>
 
-    {% if tasks %}
-      <form id="deleteForm" method="POST" action="/delete_selected" class="small-actions">
-        <button type="submit" class="btn-danger">Delete selected</button>
+    <!-- Selected day label -->
+    <div class="sub" id="selectedDateLabel"></div>
+
+    <!-- Add task for selected day -->
+    <form method="POST" action="/add" class="topbar" style="margin-top: 12px;">
+      <input type="hidden" name="date" id="taskDate" value="{{ selected_date }}">
+      <input id="taskInput" name="task" placeholder="Add a task for this day..." autocomplete="off" autofocus />
+      <button type="submit" class="btn-primary">Add</button>
+    </form>
+
+    <!-- Day actions -->
+    <div class="small-actions" style="display:flex; gap:10px; margin-top: 10px;">
+      <!-- Delete selected for the selected day -->
+      <form id="dayDeleteForm" method="POST" action="/delete_day_selected" style="margin:0;">
+        <input type="hidden" name="date" id="taskDateDelete" value="{{ selected_date }}">
+        <button type="submit" class="btn-danger">Delete selected (day)</button>
       </form>
 
-      <form method="POST" action="/delete_all" style="margin:0;">
-  <button type="submit" class="btn-danger"
-    onclick="return confirm('Delete ALL tasks?')">
-    Delete all
-  </button>
-  
-</form>
+      <!-- Delete all for the selected day -->
+      <form method="POST" action="/delete_all_for_day" style="margin:0;">
+        <input type="hidden" name="date" id="taskDateAll" value="{{ selected_date }}">
+        <button type="submit" class="btn-danger"
+                onclick="return confirm('Delete ALL tasks for this day?')">
+          Delete all (day)
+        </button>
+      </form>
+    </div>
 
-      <ul class="list">
-        {% for t in tasks %}
-          <li class="item">
-            <input class="chk" type="checkbox" name="nums" value="{{ loop.index }}" form="deleteForm">
-
-            <form method="POST" action="/mark_done" style="margin:0;">
-              <input type="hidden" name="num" value="{{ loop.index }}">
-              <button class="toggle-btn" type="submit">{% if t.done %}✅{% else %}⬜{% endif %}</button>
-            </form>
-
-            <span class="task-text {% if t.done %}done{% endif %}">{{ t.text }}</span>
-          </li>
-        {% endfor %}
-      </ul>
-    {% else %}
-      <p class="sub">No tasks yet.</p>
-    {% endif %}
+    <!-- Only tasks for selected day will render here -->
+    <div id="dayList" style="margin-top: 10px;"></div>
   </div>
+
   <script>
-  document.addEventListener("DOMContentLoaded", function () {
-    const calendarEl = document.getElementById("calendar");
-    const dateInput = document.getElementById("taskDate");
-    const taskInput = document.getElementById("taskInput");
+    document.addEventListener("DOMContentLoaded", function () {
+      // Read selected date from URL (?date=YYYY-MM-DD) or default to today
+      const params = new URLSearchParams(window.location.search);
+      const initialDate = params.get("date") || new Date().toISOString().slice(0, 10);
 
-    dateInput.value = new Date().toISOString().slice(0, 10);
+      const calendarEl = document.getElementById("calendar");
 
-    let selectedDayEl = null;
+      const dateInput = document.getElementById("taskDate");
+      const dateDeleteInput = document.getElementById("taskDateDelete");
+      const dateAllInput = document.getElementById("taskDateAll");
 
-    const calendar = new FullCalendar.Calendar(calendarEl, {
-      initialView: "dayGridMonth",
-      events: "/events",
+      const taskInput = document.getElementById("taskInput");
+      const selectedDateLabel = document.getElementById("selectedDateLabel");
+      const dayList = document.getElementById("dayList");
 
-      dateClick: function(info) {
-        // update the date the form will submit
-        dateInput.value = info.dateStr;
-
-        // remove old highlight
+      let selectedDate = initialDate;
+      let selectedDayEl = null;
+      function applySelectedDayHighlight() {
+  // remove old highlight (if any)
         if (selectedDayEl) selectedDayEl.classList.remove("selected-day");
+        selectedDayEl = null;
 
-        // add highlight to the clicked day cell
-        selectedDayEl = info.dayEl;
-        selectedDayEl.classList.add("selected-day");
+  // find the day cell for selectedDate and highlight it (only if it exists in current view)
+        const cell = calendarEl.querySelector(`.fc-daygrid-day[data-date="${selectedDate}"]`);
+        if (cell) {
+          selectedDayEl = cell;
+          selectedDayEl.classList.add("selected-day");
+  }
+}
 
-if (taskInput) taskInput.focus();
+      function setSelectedDate(dayStr) {
+        selectedDate = dayStr;
 
+        // Keep all forms synced to the selected day
+        dateInput.value = dayStr;
+        dateDeleteInput.value = dayStr;
+        dateAllInput.value = dayStr;
+
+        selectedDateLabel.textContent = `Selected date: ${dayStr}`;
+
+        // Keep URL synced so refresh stays on this day
+        history.replaceState(null, "", `/?date=${dayStr}`);
       }
+
+      async function refreshDayList(day) {
+        const res = await fetch(`/tasks_for_day?date=${encodeURIComponent(day)}`);
+        const data = await res.json();
+        renderDayList(data);
+      }
+
+      async function postToggleDone(id) {
+        const form = new URLSearchParams();
+        form.append("id", id);
+
+        await fetch("/toggle_done", {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: form.toString()
+        });
+      }
+
+      function renderDayList(items) {
+        if (!items.length) {
+          dayList.innerHTML = `<p class="sub">No tasks for this day.</p>`;
+          return;
+        }
+
+        dayList.innerHTML = `
+          <ul class="list">
+            ${items.map(t => `
+              <li class="item">
+                <input class="chk" type="checkbox" name="ids" value="${t.id}" form="dayDeleteForm">
+
+                <button class="toggle-btn" type="button" data-id="${t.id}">
+                  ${t.done ? "✅" : "⬜"}
+                </button>
+
+                <span class="task-text ${t.done ? "done" : ""}">${t.text}</span>
+              </li>
+            `).join("")}
+          </ul>
+        `;
+
+        // Wire toggle buttons
+        dayList.querySelectorAll(".toggle-btn").forEach(btn => {
+          btn.addEventListener("click", async () => {
+            const id = btn.getAttribute("data-id");
+            await postToggleDone(id);
+            await refreshDayList(selectedDate);
+            calendar.refetchEvents();
+          });
+        });
+      }
+
+      const calendar = new FullCalendar.Calendar(calendarEl, {
+        initialView: "dayGridMonth",
+        events: "/events",
+        datesSet: function() {
+          applySelectedDayHighlight();
+      },
+
+
+        dateClick: async function(info) {
+          setSelectedDate(info.dateStr);
+          applySelectedDayHighlight();
+
+          // Highlight selected day cell (works if your CSS defines .selected-day)
+          if (selectedDayEl) selectedDayEl.classList.remove("selected-day");
+          selectedDayEl = info.dayEl;
+          selectedDayEl.classList.add("selected-day");
+
+          await refreshDayList(selectedDate);
+          if (taskInput) taskInput.focus();
+        },
+
+        eventClick: async function(info) {
+          const id = info.event.extendedProps?.id;
+          if (!id) return;
+
+          await postToggleDone(id);
+          calendar.refetchEvents();
+          await refreshDayList(selectedDate);
+        }
+      });
+
+      // INIT: start on URL date (not forced to today)
+      calendar.render();
+      calendar.gotoDate(initialDate);
+      setSelectedDate(initialDate);
+      applySelectedDayHighlight();
+      refreshDayList(initialDate);
+
     });
-
-    calendar.render();
-  });
-</script>
-
-
+  </script>
 </body>
 </html>
