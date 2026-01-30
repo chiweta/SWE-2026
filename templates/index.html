@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Task Tracker</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.20/index.global.min.js"></script>
 
 
 
@@ -16,11 +17,18 @@
       <h1>Task Tracker</h1>
       <div class="sub">{{ tasks|length }} task(s)</div>
     </div>
+  <div id="calendar"></div>
 
-    <form method="POST" action="/add" class="topbar">
-      <input name="task" placeholder="Add a task..." autocomplete="off" autofocus />
-      <button type="submit" class="btn-primary">Add</button>
-    </form>
+
+
+
+    <form method="POST" action="/add" class="topbar" style="margin-top: 12px;">
+  <input type="hidden" name="date" id="taskDate">
+
+  <input id="taskInput" name="task" placeholder="Add a task..." autocomplete="off" autofocus />
+  <button type="submit" class="btn-primary">Add</button>
+</form>
+
 
     <div class="divider"></div>
 
@@ -34,6 +42,7 @@
     onclick="return confirm('Delete ALL tasks?')">
     Delete all
   </button>
+  
 </form>
 
       <ul class="list">
@@ -54,5 +63,40 @@
       <p class="sub">No tasks yet.</p>
     {% endif %}
   </div>
+  <script>
+  document.addEventListener("DOMContentLoaded", function () {
+    const calendarEl = document.getElementById("calendar");
+    const dateInput = document.getElementById("taskDate");
+    const taskInput = document.getElementById("taskInput");
+
+    dateInput.value = new Date().toISOString().slice(0, 10);
+
+    let selectedDayEl = null;
+
+    const calendar = new FullCalendar.Calendar(calendarEl, {
+      initialView: "dayGridMonth",
+      events: "/events",
+
+      dateClick: function(info) {
+        // update the date the form will submit
+        dateInput.value = info.dateStr;
+
+        // remove old highlight
+        if (selectedDayEl) selectedDayEl.classList.remove("selected-day");
+
+        // add highlight to the clicked day cell
+        selectedDayEl = info.dayEl;
+        selectedDayEl.classList.add("selected-day");
+
+if (taskInput) taskInput.focus();
+
+      }
+    });
+
+    calendar.render();
+  });
+</script>
+
+
 </body>
 </html>

@@ -1,4 +1,5 @@
-from flask import Flask, render_template, request, redirect, url_for
+from flask import Flask, render_template, request, redirect, url_for, jsonify
+from datetime import date
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -13,31 +14,45 @@ FILE_PATH = BASE_DIR / "tasks.txt"
 
 
 def load_tasks():
-    tasks=[]
+    tasks = []
     try:
         with open(FILE_PATH, "r", encoding="utf-8") as f:
             for raw in f:
-                raw=raw.strip()
+                raw = raw.strip()
                 if not raw:
                     continue
 
-                if "|" not in raw:
-                    tasks.append({"done": False, "text": raw})
+                parts = raw.split("|", 2)
+
+                # Old format: "text"
+                if len(parts) == 1:
+                    tasks.append({"done": False, "date": date.today().isoformat(), "text": parts[0]})
                     continue
 
-                status, text = raw.split("|", 1)
-                tasks.append({"done": status =="1", "text": text.strip()})
+                # Old format: "done|text"
+                if len(parts) == 2:
+                    status, text = parts
+                    tasks.append({"done": status == "1", "date": date.today().isoformat(), "text": text.strip()})
+                    continue
+
+                # New format: "done|date|text"
+                status, d, text = parts
+                tasks.append({"done": status == "1", "date": d.strip(), "text": text.strip()})
+
     except FileNotFoundError:
         pass
+
     return tasks
 
 
 
+
 def save_tasks(tasks):
-    with open(FILE_PATH, "w", encoding="utf-8")as f:
+    with open(FILE_PATH, "w", encoding="utf-8") as f:
         for t in tasks:
             status = "1" if t["done"] else "0"
-            f.write(f"{status}|{t['text']}\n")
+            f.write(f"{status}|{t['date']}|{t['text']}\n")
+
 
 def toggle_done(num):
     tasks= load_tasks()
@@ -53,11 +68,28 @@ def home():
 @app.post("/add")
 def add():
     task = request.form.get("task", "").strip()
+    task_date = request.form.get("date", "").strip() or date.today().isoformat()
+
     if task:
         tasks = load_tasks()
-        tasks.append({"done": False, "text": task})
+        tasks.append({"done": False, "date": task_date, "text": task})
         save_tasks(tasks)
+
     return redirect(url_for("home"))
+
+@app.get("/events")
+def events():
+    tasks = load_tasks()
+    return jsonify([
+        {
+            "title": ("✅ " if t["done"] else "") + t["text"],
+            "start": t["date"],   # YYYY-MM-DD
+            "allDay": True
+        }
+        for t in tasks
+        if t.get("date")
+    ])
+
 
 
 

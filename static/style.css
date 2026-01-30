@@ -157,3 +157,47 @@ button:active{ transform: scale(0.98); }
   text-align:center;
   padding: 9px 10px;
 }
+/* Highlight the selected calendar day */
+.selected-day {
+  outline: 2px solid #7c5cff;
+  outline-offset: -2px;
+  border-radius: 8px;
+  background: rgba(124, 92, 255, 0.12);
+}
+/* RED circle for "today" */
+.fc .fc-daygrid-day.fc-day-today .fc-daygrid-day-number {
+  border: 2px solid #ef4444;
+  border-radius: 999px;
+  padding: 2px 8px;
+}
+
+/* GREEN circle for selected day */
+.fc .fc-daygrid-day.selected-day .fc-daygrid-day-number {
+  border: 2px solid #22c55e;
+  border-radius: 999px;
+  padding: 2px 8px;
+}
+
+/* Optional: little glow so it pops */
+.fc .fc-daygrid-day.selected-day .fc-daygrid-day-number {
+  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.18);
+}
+.fc .fc-daygrid-day.fc-day-today .fc-daygrid-day-number {
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.18);
+}
+/* Remove FullCalendar's default yellow "today" background */
+.fc .fc-daygrid-day.fc-day-today {
+  background: transparent !important;
+}
+
+/* Remove any default selection highlight FullCalendar might apply */
+.fc .fc-highlight {
+  background: transparent !important;
+}
+
+/* Remove your old selected-day purple background/outline if you added it */
+.fc .fc-daygrid-day.selected-day {
+  background: transparent !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
